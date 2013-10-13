@@ -9,20 +9,20 @@ import java.util.ArrayList;
 
 public class Logger {
 	
-	String OS;
+	boolean WINDOWS;
 	File log = new File(CommandCenter.homeDir.getPath() + File.separator + "log.txt");
 	FileWriter logger;
 	BufferedWriter bw;
 	PrintWriter pw;
 	
-	public Logger(String os) throws IOException{
-		OS = os;
+	public Logger(boolean DOS) throws IOException{
+		WINDOWS = DOS;
 		logger = new FileWriter(log, true); //append to the end of the file, don't overwrite
 		bw = new BufferedWriter(logger); //buffer the writer
 		pw = new PrintWriter(bw); //ease of use class
 	}
 
-	protected void log(String[] cmdIn, String[] cmdOut){
+	protected synchronized void log(String[] cmdIn, String[] cmdOut){
 		String write = "";
 		write += CommandCenter.getDate() + " ";
 		write += CommandCenter.getTime() + ": ";
@@ -40,7 +40,56 @@ public class Logger {
 		pw.flush();
 	}
 	
-	public void logError(ArrayList<String> s){
+	protected synchronized void log(String[] cmdIn, String[] cmdOut, String n){
+		String write = "";
+		write += CommandCenter.getDate() + " ";
+		write += CommandCenter.getTime() + ": ";
+		write += CommandCenter.point.getAbsolutePath() + "> ";
+		for(String s: cmdIn)
+			if(!s.equals(CommandCenter.point.getAbsolutePath()))
+				write += s + " ";
+		pw.println(write);
+		if((cmdIn.length != cmdOut.length || !cmdIn[0].equals(cmdOut[0])) && !cmdOut[2].equals(cmdIn[0])){
+			write = "   Command translated to: ";
+			for(String s: cmdOut)
+				write += s+ " ";
+			pw.println(write);
+		}
+		pw.flush();
+		note(n);
+	}
+	
+	protected synchronized void log(String[] cmd){
+		String write = "";
+		write += CommandCenter.getDate() + " ";
+		write += CommandCenter.getTime() + ": ";
+		write += CommandCenter.point.getAbsolutePath() + "> ";
+		for(String s: cmd)
+			if(!s.equals(CommandCenter.point.getAbsolutePath()))
+				write += s + " ";
+		pw.println(write);
+		pw.flush();
+	}
+	
+	protected synchronized void log(String[] cmd, String n){
+		String write = "";
+		write += CommandCenter.getDate() + " ";
+		write += CommandCenter.getTime() + ": ";
+		write += CommandCenter.point.getAbsolutePath() + "> ";
+		for(String s: cmd)
+			if(!s.equals(CommandCenter.point.getAbsolutePath()))
+				write += s + " ";
+		pw.println(write);
+		pw.flush();
+		note(n);
+	}
+	
+	private synchronized void note(String s){
+		pw.println("  --NOTE: " + s);
+		pw.flush();
+	}
+	
+	public synchronized void logError(ArrayList<String> s){
 		String write = "    Error caught: ";
 		for(String st: s)
 			write += st + System.getProperty("line.separator");
@@ -48,15 +97,16 @@ public class Logger {
 		pw.flush();
 	}
 	
-	public void logError(String s){
+	public synchronized void logError(String s){
 		String write = "    Error caught: " + s;
 		pw.println(write);
 		pw.flush();
 	}
 	
 	public void logOn(){
+		pw.println("");
 		pw.println("------NEW SESSION: " + CommandCenter.getDate() + " " + CommandCenter.getTime() + "------");
-		if(OS.equals("windows")){
+		if(WINDOWS){
 			pw.println("   Windows OS detected. All commands will be translated.");
 		}
 		pw.flush();

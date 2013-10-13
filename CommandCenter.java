@@ -7,15 +7,10 @@ import java.util.GregorianCalendar;
 
 public class CommandCenter {
 
-	/**
-	 * @param args
-	 * 
-	 * TODO add Commands class for user profiles, add users
-	 * @throws Throwable 
-	 * 
-	 */
-	protected static boolean run = true;
-	protected static String input = "", QUIT = "quit", TIME = "time", CD = "cd", OS, commands[];
+	private static final boolean dev = true;
+	
+	protected static boolean run = true, found, WINDOWS;
+	protected static String input = "", commands[];
 	protected static BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
 	protected static File homeDir, point;
 	protected static Translogger translogger;
@@ -26,7 +21,7 @@ public class CommandCenter {
 	protected static Command custom[];
 	
 	
-	private static CommandCenter inst = new CommandCenter(); //static instance for accessing outer static methods 
+	private static final CommandCenter inst = new CommandCenter(); //static instance for accessing outer static methods 
 	
 	
 	public static void main(String[] args) throws Throwable{
@@ -36,16 +31,16 @@ public class CommandCenter {
 		point = homeDir;
 		System.out.println("Checking directories...");
 		if(!homeDir.exists())
-				homeDir.mkdir();
+				homeDir.mkdir();//make CommandCenter folder if none exists
 		System.out.println("Determining OS...");
-		OS = System.getProperty("os.name");
+		String OS = System.getProperty("os.name");
 		if(OS.contains("Windows"))
-			OS = "windows";
+			WINDOWS = true;  //DOS
 		else
-			OS = "unix";
+			WINDOWS = false; //non DOS system
 		System.out.println("Booting up utilities...");
 		booter = new Booter();
-		translogger = new Translogger(OS);
+		translogger = new Translogger(WINDOWS);
 		parser = new CommandParser();
 		booter.boot();  //may cause terminate program if problem with boot
 		
@@ -69,19 +64,60 @@ public class CommandCenter {
 			catch(Exception e){System.out.println("Input error");}
 			
 			if(!input.equals("")){
-				//new code block with custom classes should go here
-				//commands = parser.parse(input);
-				
-				
+				if(dev){
+					try{
+						found = false;
+						commands = parser.parseFull(input);
+						String command = parser.parseCommand(input);
+						for(Command c: Command.getCommands()){
+							if(c.is(command)){
+								if(c.validFlags(parser.parseFlags(input))){//return boolean, throw ProperSyntaxError
+									c.execute(commands);
+								}//if validFlags
+							}//if c.is(input)
+						}//for each command
+						if(!found){//following block allows for shell use while still being developed
+							/***Following block appends location in front of commands like ls***/
+							commands = input.split("\\s++");
+							if (commands.length == 1){
+								String[] temp = new String[2];
+								temp[0] = commands[0];
+								temp[1] = point.getPath();
+								commands = temp;
+							}
+							/****************************************************************/
+							Process child = Runtime.getRuntime().exec(commands);
+							BufferedReader childOut = new BufferedReader(new InputStreamReader(child.getInputStream()));
+							BufferedReader childErr = new BufferedReader(new InputStreamReader(child.getErrorStream()));
+							child.waitFor();
+							while((input = childOut.readLine()) != null)
+								System.out.println(input);
+							ArrayList<String> errors = new ArrayList<String>();
+							while((input = childErr.readLine()) != null)
+								errors.add(input);
+							for(String e: errors)
+								System.out.println(e);
+							translogger.logError(errors);
+						}
+					}
+					catch(Exception e){
+						System.out.println(e.getMessage());
+						translogger.logError(e.getMessage());
+					}
+				}//if dev
+			else{
 				//TODO REMOVE CODE BLOCK AFTER IMPLEMENTATION OF NEW CLASSES 
-				if(input.equalsIgnoreCase(QUIT) || input.equalsIgnoreCase("exit")){
+				if(input.equalsIgnoreCase("tasklist")){
+					Command.TASKLIST.execute(null);
+				}
+				else if(input.equalsIgnoreCase("quit") || input.equalsIgnoreCase("exit")){
 					System.out.println();
 					System.out.println("Command Center use time: " + startTime.diff(inst.new Time()).toString());
 					System.out.println("Logging off");
 					translogger.logOff();
 					System.exit(0);
 				}
-				else if(input.equalsIgnoreCase(TIME))
+				else if(input.equalsIgnoreCase("time"))
 					System.out.println(inst.new Time().toString());
 				
 				else{
@@ -103,11 +139,15 @@ public class CommandCenter {
 						ArrayList<String> errors = new ArrayList<String>();
 						while((input = childErr.readLine()) != null)
 							errors.add(input);
+						for(String e: errors)
+							System.out.println(e);
+						translogger.logError(errors);
 					}
 					catch (Exception e){
 						System.out.println(e.getMessage());
 						translogger.logError(e.getMessage());
 					}
+				}
 				}
 			}//if
 			prompt = point.getPath() + ">>";
@@ -138,9 +178,27 @@ public class CommandCenter {
 		}
 		
 		public String toString(){
-			if(MILLI<100)
-				return HOUR + ":" + MINUTE + ":" + SECOND + ".0" + MILLI;
-			return HOUR + ":" + MINUTE + ":" + SECOND + "." + MILLI;
+			String h,m,s,mil;
+			if(HOUR<10)
+				h = "0" + HOUR;
+			else
+				h = "" + HOUR;
+			if(MINUTE<10)
+				m = "0" + MINUTE;
+			else
+				m = "" + MINUTE;
+			if(SECOND<10)
+				s = "0" + SECOND;
+			else
+				s = "" + SECOND;
+			if(MILLI<100){
+				mil = "0" + MILLI;
+				if(MILLI<10)
+					mil = "0" + mil;
+			}
+			else mil = "" + MILLI;
+			
+			return h + ":" + m + ":" + s + "." + mil;
 		}
 		
 		public Time diff(Time in){
